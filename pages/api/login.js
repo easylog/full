@@ -1,23 +1,59 @@
-import jwt from 'jsonwebtoken';
+// pages/auth/login.js – Login-Seite aktiv mit Weiterleitung 🔐
+import { useState } from 'react';
+import { useRouter } from 'next/router';
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+export default function Login() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const { email, password } = req.body;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
 
-  const users = [
-    { email: 'admin@easylog.ch', password: 'admin123', role: 'admin' },
-    { email: 'mitarbeiter@easylog.ch', password: 'test123', role: 'staff' }
-  ];
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
 
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) return res.status(401).json({ message: 'Login fehlgeschlagen' });
+    const data = await res.json();
+    if (!res.ok) return setError(data.message || 'Login fehlgeschlagen');
 
-  const token = jwt.sign(
-    { email: user.email, role: user.role },
-    process.env.JWT_SECRET || 'devsecret',
-    { expiresIn: '7d' }
+    localStorage.setItem('token', data.token);
+
+    // JWT decodieren (unsicher aber einfach für Demo)
+    const payload = JSON.parse(atob(data.token.split('.')[1]));
+    if (payload.role === 'admin') router.push('/dashboard/admin');
+    else router.push('/dashboard/staff');
+  };
+
+  return (
+    <main className="p-6 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Login</h1>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <input
+          type="email"
+          placeholder="E-Mail"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="border p-2 w-full"
+          required
+        />
+        <input
+          type="password"
+          placeholder="Passwort"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="border p-2 w-full"
+          required
+        />
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+          Login
+        </button>
+      </form>
+    </main>
   );
-
-  res.status(200).json({ token });
 }
